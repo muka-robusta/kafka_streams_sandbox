@@ -13,8 +13,7 @@ import org.apache.kafka.streams.kstream.Produced;
 import java.util.Arrays;
 import java.util.Properties;
 
-public class StreamsStarterApp {
-
+public class StreamsStartApp {
     public static void main(String[] args) {
         Properties config = new Properties();
         config.put(StreamsConfig.APPLICATION_ID_CONFIG, "word-count");
@@ -28,7 +27,7 @@ public class StreamsStarterApp {
         // 1 - Stream from Kafka
         KStream<String, String> wordCountInput = builder.stream("word-count-input");
 
-                // 2 - Map values to lowercase
+        // 2 - Map values to lowercase
         KTable<String, Long> wordCounts = wordCountInput.mapValues(value -> value.toLowerCase())
                 // 3 - Flatmap values split by space
                 .flatMapValues(value -> Arrays.asList(value.split(" ")))
@@ -51,5 +50,6 @@ public class StreamsStarterApp {
         // Add shutdown hook
         Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
     }
-
 }
+
+
