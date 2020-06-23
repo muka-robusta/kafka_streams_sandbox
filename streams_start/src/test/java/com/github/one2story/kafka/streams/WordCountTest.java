@@ -1,0 +1,69 @@
+package com.github.one2story.kafka.streams;
+
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.LongDeserializer;
+import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.Topology;
+import org.apache.kafka.streams.TopologyTestDriver;
+import org.apache.kafka.streams.test.ConsumerRecordFactory;
+import org.apache.kafka.streams.test.OutputVerifier;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
+import java.util.Properties;
+
+import static org.junit.Assert.assertEquals;
+
+public class WordCountTest {
+
+    TopologyTestDriver testDriver;
+    StringSerializer stringSerializer = new StringSerializer();
+    ConsumerRecordFactory<String, String> recordFactory = new ConsumerRecordFactory<>(stringSerializer, stringSerializer);
+
+    @Before
+    public void setUpTopologyTestDriver(){
+        Properties config = new Properties();
+        config.put(StreamsConfig.APPLICATION_ID_CONFIG, "test");
+        config.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "dummy:1234");
+        config.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+        config.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+
+        Topology testTopology = new StreamsStartApp().createTopology();
+
+        testDriver = new TopologyTestDriver(testTopology, config);
+
+    }
+
+    @After
+    public void closeTestDriver()
+    {
+        testDriver.close();
+    }
+
+    public void pushNewInputRecord(String value)
+    {
+        testDriver.pipeInput(recordFactory.create("word-count-input", null, value));
+    }
+
+    public ProducerRecord<String, Long> readOutput()
+    {
+        return testDriver.readOutput("word-count-output", new StringDeserializer(), new LongDeserializer());
+    }
+
+    @Test
+    public void makeSureCountAreCorrect()
+    {
+        String firstExample = "Testing kafka streams";
+        pushNewInputRecord(firstExample);
+        ProducerRecord<String, Long> firstOutput = readOutput();
+        OutputVerifier.compareKeyValue(readOutput(), "testing", 1L);
+        OutputVerifier.compareKeyValue(readOutput(), "kafka", 1L);
+        OutputVerifier.compareKeyValue(readOutput(), "streams", 1L);
+        assertEquals(readOutput(), null);
+    }
+
+}

@@ -5,6 +5,7 @@ import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.KTable;
 import org.apache.kafka.streams.kstream.Named;
@@ -14,15 +15,9 @@ import java.util.Arrays;
 import java.util.Properties;
 
 public class StreamsStartApp {
-    public static void main(String[] args) {
-        Properties config = new Properties();
-        config.put(StreamsConfig.APPLICATION_ID_CONFIG, "word-count");
-        config.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-        config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        config.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
-        config.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
 
-
+    public Topology createTopology()
+    {
         StreamsBuilder builder = new StreamsBuilder();
         // 1 - Stream from Kafka
         KStream<String, String> wordCountInput = builder.stream("word-count-input");
@@ -40,8 +35,21 @@ public class StreamsStartApp {
 
         // 7 - write the results back to kafka
         wordCounts.toStream().to("word-count-output", Produced.with(Serdes.String(), Serdes.Long()));
+        return builder.build();
+    }
 
-        KafkaStreams streams = new KafkaStreams(builder.build(), config);
+    public static void main(String[] args) {
+        Properties config = new Properties();
+        config.put(StreamsConfig.APPLICATION_ID_CONFIG, "word-count");
+        config.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        config.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+        config.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+
+        StreamsStartApp app = new StreamsStartApp();
+        Topology appTopology = app.createTopology();
+
+        KafkaStreams streams = new KafkaStreams(appTopology, config);
         streams.start();
 
         // Printed the topology
