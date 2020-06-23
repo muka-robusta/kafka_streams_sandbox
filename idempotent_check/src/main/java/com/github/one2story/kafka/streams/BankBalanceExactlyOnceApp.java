@@ -8,12 +8,14 @@ import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.Serializer;
+import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.connect.json.JsonDeserializer;
 import org.apache.kafka.connect.json.JsonSerializer;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.*;
+import org.apache.kafka.streams.state.KeyValueStore;
 
 import java.time.Instant;
 import java.util.Properties;
@@ -40,7 +42,8 @@ public class BankBalanceExactlyOnceApp {
         final Serde<JsonNode> jsonSerde = Serdes.serdeFrom(jsonSerializer, jsonDeserializer);
 
         StreamsBuilder streamsBuilder = new StreamsBuilder();
-        KStream<String, JsonNode> bankTransaction = streamsBuilder.stream(transactionsTopic, Consumed.with(Serdes.String(), jsonSerde));
+        KStream<String, JsonNode> bankTransaction = streamsBuilder
+                .stream(transactionsTopic, Consumed.with(Serdes.String(), jsonSerde));
 
         // create the initial json object for balances
         ObjectNode initialBalance = JsonNodeFactory.instance.objectNode();
@@ -49,13 +52,14 @@ public class BankBalanceExactlyOnceApp {
         initialBalance.put("time", Instant.ofEpochMilli(0L).toString());
 
         KTable<String, JsonNode> bankBalance = bankTransaction
+                //.groupByKey(Serialized.with(Serdes.String(), jsonSerde))
                 .groupByKey()
-                // .groupByKey(Grouped.with(Serdes.String(), jsonSerde))
                 .aggregate(
                         () -> initialBalance,
                         (key, transaction, balance) -> newBalance(transaction, balance),
-                        jsonSerde,
-                        "bank-balance-agg"
+                        Materialized.<String, JsonNode, KeyValueStore<Bytes, byte[]>>as("bank-balance-agg")
+                                .withKeySerde(Serdes.String())
+                                .withValueSerde(jsonSerde)
                 );
 
         bankBalance.toStream().to("bank-balance-exactly-once");
